@@ -161,6 +161,28 @@ footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
   border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; cursor: pointer;
 }
 #mcopymsg { font-size: 0.85rem; color: var(--muted); }
+
+.wchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
+.wchips .lbl { font-size: 0.85rem; color: var(--muted); margin-right: 4px; }
+.rgrid {
+  display: grid; grid-template-columns: 44px repeat(5, minmax(0, 1fr)) 34px; gap: 6px 5px;
+  margin-top: 16px; align-items: center;
+}
+.rh { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; text-align: center; line-height: 1.2; }
+.rh small { display: block; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.rday { font-weight: 600; font-size: 0.9rem; }
+.rday.today { color: var(--accent); }
+.rday.today::after { content: " •"; }
+.rbtn {
+  width: 100%; aspect-ratio: 1; max-height: 52px; border-radius: 10px; cursor: pointer;
+  border: 1.5px dashed var(--line); background: var(--surface); color: transparent;
+  font: 700 1.2rem/1 var(--font-body); display: grid; place-items: center;
+}
+.rbtn[aria-pressed="true"] { background: var(--accent); border: 1.5px solid var(--accent); color: var(--bg); }
+.rsum { font-size: 0.78rem; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rsum.full { color: var(--accent); font-weight: 700; }
+.rweek { margin-top: 14px; font-size: 0.9rem; }
+.rweek b { font-variant-numeric: tabular-nums; }
 #mcopytext { width: 100%; min-height: 9em; margin-top: 10px; font: 0.85rem/1.4 var(--font-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0}</style>
@@ -172,6 +194,7 @@ footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
 
   <nav class="tabs" role="tablist" aria-label="Části aplikace">
     <button class="tab" type="button" role="tab" data-view="nakupy" aria-selected="true">Nákupy</button>
+    <button class="tab" type="button" role="tab" data-view="pravidla" aria-selected="false">Pravidla</button>
     <button class="tab" type="button" role="tab" data-view="mereni" aria-selected="false">Měření</button>
   </nav>
 
@@ -186,6 +209,21 @@ footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
   <div id="list"></div>
 
   <footer>Odškrtnuté položky si telefon pamatuje. Množství jsou spočítaná podle receptů z knihy.</footer>
+  </div>
+
+  <div id="view-pravidla" hidden>
+    <h2 class="sec">Každý den rozhoduje</h2>
+    <p class="lead">Každý den si odškrtni všech 5 pravidel. Ťukni na políčko, druhým ťuknutím odškrtnutí zrušíš.</p>
+    <div class="wchips" id="wchips" role="group" aria-label="Můj týden číslo"></div>
+    <div class="rgrid" id="rgrid"></div>
+    <p class="rweek" id="rweek"></p>
+    <ul class="howto">
+      <li><b>Voda:</b> vypij aspoň 1,5 l.</li>
+      <li><b>Káva:</b> jen do 14:00, žádný alkohol.</li>
+      <li><b>Dřepy:</b> 30 dřepů po jídle (jablečný ocet).</li>
+      <li><b>Chůze:</b> 30 minut.</li>
+      <li><b>Jídlo:</b> poslední jídlo do 17:00.</li>
+    </ul>
   </div>
 
   <div id="view-mereni" hidden>
@@ -524,10 +562,49 @@ document.getElementById('mcopy').addEventListener('click', () => {
   } else fallback();
 });
 
+// ── Pravidla ───────────────────────────────────────────
+const RULES = [['voda','Voda','1,5 l'],['kava','Káva','do 14 h'],['drepy','Dřepy','30×'],['chuze','Chůze','30 min'],['jidlo','Jídlo','do 17 h']];
+const RDAYS = [['po','Po'],['ut','Út'],['st','St'],['ct','Čt'],['pa','Pá'],['so','So'],['ne','Ne']];
+const RSTORE = 'restartujem-pravidla';
+let rdata = {}, rweek = 1;
+try { rdata = JSON.parse(localStorage.getItem(RSTORE) || '{}') || {}; } catch (e) { rdata = {}; }
+try { rweek = +localStorage.getItem(RSTORE + '-tyden') || 1; } catch (e) {}
+function rsave() { try { localStorage.setItem(RSTORE, JSON.stringify(rdata)); localStorage.setItem(RSTORE + '-tyden', String(rweek)); } catch (e) {} }
+const todayIdx = (new Date().getDay() + 6) % 7;
+
+function renderR() {
+  document.getElementById('wchips').innerHTML = '<span class="lbl">Můj týden:</span>' +
+    [1,2,3,4,5].map(w => `<button class="chip" type="button" data-w="${w}" aria-pressed="${w === rweek}">${w}.</button>`).join('');
+  const wk = rdata['t' + rweek] || {};
+  let h = '<span></span>' + RULES.map(([, n, s]) => `<span class="rh">${n}<small>${s}</small></span>`).join('') + '<span></span>';
+  let total = 0, fullDays = 0;
+  RDAYS.forEach(([d, label], i) => {
+    const day = wk[d] || {};
+    const cnt = RULES.filter(([r]) => day[r]).length;
+    total += cnt; if (cnt === 5) fullDays++;
+    h += `<span class="rday${i === todayIdx ? ' today' : ''}">${label}</span>`;
+    h += RULES.map(([r, n]) => `<button class="rbtn" type="button" data-d="${d}" data-r="${r}" aria-pressed="${!!day[r]}" aria-label="${label} – ${n}">✓</button>`).join('');
+    h += `<span class="rsum${cnt === 5 ? ' full' : ''}">${cnt}/5</span>`;
+  });
+  document.getElementById('rgrid').innerHTML = h;
+  document.getElementById('rweek').innerHTML = `Tento týden: <b>${total} / 35</b> odškrtnutí, celých dnů <b>${fullDays} / 7</b>.`;
+}
+document.getElementById('wchips').addEventListener('click', e => {
+  const b = e.target.closest('[data-w]'); if (!b) return;
+  rweek = +b.dataset.w; rsave(); renderR();
+});
+document.getElementById('rgrid').addEventListener('click', e => {
+  const b = e.target.closest('.rbtn'); if (!b) return;
+  const wk = rdata['t' + rweek] = rdata['t' + rweek] || {};
+  const day = wk[b.dataset.d] = wk[b.dataset.d] || {};
+  if (day[b.dataset.r]) delete day[b.dataset.r]; else day[b.dataset.r] = 1;
+  rsave(); renderR();
+});
+renderR();
+
 // ── Přepínání záložek ──────────────────────────────────
 function showView(v) {
-  document.getElementById('view-nakupy').hidden = v !== 'nakupy';
-  document.getElementById('view-mereni').hidden = v !== 'mereni';
+  for (const id of ['nakupy', 'pravidla', 'mereni']) document.getElementById('view-' + id).hidden = v !== id;
   document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === v)));
   try { localStorage.setItem('restartujem-view', v); } catch (e) {}
 }
@@ -537,7 +614,7 @@ document.querySelector('.tabs').addEventListener('click', e => {
 renderM();
 let startView = 'nakupy';
 try { startView = localStorage.getItem('restartujem-view') || 'nakupy'; } catch (e) {}
-showView(startView === 'mereni' ? 'mereni' : 'nakupy');
+showView(['nakupy', 'pravidla', 'mereni'].includes(startView) ? startView : 'nakupy');
 </script>
 
 <script>
