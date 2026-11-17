@@ -191,7 +191,7 @@ footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
 </head>
 <body>
 <div class="wrap">
-  <h1>Nákupy na 1. týden</h1>
+  <h1 id="title">Restartujem</h1>
   <p class="lead">Hubnu 5× rychleji · varianta podzim/zima. Seznam dne obsahuje, co na ten den potřebuješ. Nakupuj ho den předem.</p>
 
   <nav class="tabs" role="tablist" aria-label="Části aplikace">
@@ -202,6 +202,7 @@ footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
 
   <div id="view-nakupy">
   <div class="picker">
+    <div class="wchips" id="nweek" role="group" aria-label="Vyber týden" style="margin-top:0;margin-bottom:8px"></div>
     <div class="chips" id="chips" role="group" aria-label="Vyber dny"></div>
     <p class="hint">Ťukni na víc dní najednou a seznamy se sečtou do jednoho nákupu.</p>
     <div class="progress"><div class="bar"><i id="bar"></i></div><span id="count">0 / 0</span></div>
@@ -256,7 +257,7 @@ const CATS = {
   spiz: 'Spíž – trvanlivé'
 };
 // [cat, key, name, qty|null, unit, note]
-const DAYS = [
+const WEEK1 = [
   { id:'po', short:'Po', name:'Pondělí',
     meals:[['Snídaně',[[14,'Rychlá omeleta s pečenou zeleninou a cottagem']]],
            ['Oběd',[[36,'Kuřecí kari na cibulové pastě + 70 g rýže'],[13,'Salát z červeného zelí']]],
@@ -388,19 +389,156 @@ const DAYS = [
     ]}
 ];
 
-const STORE = 'restartujem-t1-v1';
-let checked = {};
-let sel = new Set(['po']);
-try { checked = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (e) { checked = {}; }
-try { const s = JSON.parse(localStorage.getItem(STORE + '-sel') || 'null'); if (Array.isArray(s) && s.length) sel = new Set(s); } catch (e) {}
+const WEEK2 = [
+  { id:'po', short:'Po', name:'Pondělí',
+    meals:[['Snídaně',[[15,'Vejce s řeckým koprovým jogurtem (místo kedlubny mrkev)'],[5,'Nízkosacharidový chléb, 1 porce']]],
+           ['Oběd',[[70,'Bazalkové halloumi s rýží']]],
+           ['Večeře',[[3,'Sametová květáková polévka s ricottou a fetou']]]],
+    prep:['V neděli upeč nízkosacharidový chléb (12 porcí). Spotřebuješ 2 porce (Po, Út), zbytek nakrájej a zamraz na další týdny.'],
+    have:'Ze spíže z 1. týdne nekupuj znovu, co ti zbylo (ghí, olej, sója, rozinky, mandle, chilli omáčka, kypřící prášek, strouhanka…).',
+    items:[
+      ['chlaz','vejce','Vejce',30,'ks','na celý týden (potřebuješ 26)'],
+      ['chlaz','recky','Řecký jogurt 0 %',140,'g','koprový jogurt'],
+      ['chlaz','halloumi','Sýr halloumi',125,'g',''],
+      ['chlaz','pesto','Bazalkové pesto',1,'malá sklenice','Po, Čt, Pá – celkem ~45 g'],
+      ['chlaz','feta','Sýr feta',40,'g',''],
+      ['chlaz','ricotta','Ricotta',70,'g',''],
+      ['zel','kopr','Kopr čerstvý',1,'svazek',''],
+      ['zel','chilli','Chilli paprička',1,'ks',''],
+      ['zel','mrkev','Mrkev',200,'g','Po místo kedlubny, Út + So salát – pokud nezbyla'],
+      ['zel','paprika','Paprika barevná',1,'ks (~80 g)',''],
+      ['zel','kvetak','Květák',1,'velký ~700 g','Po polévka 300 g + Čt a Pá k čočce 2 × 200 g'],
+      ['zel','petrzel','Petržel čerstvá',1,'svazek','Po polévka, Út a So salát'],
+      ['zel','citron','Citron (bio)',2,'ks','Út a So salát, Út kuře, Ne kapustičky'],
+      ['zel','cercib','Červená cibule',2,'ks','Po, St'],
+      ['zel','cibule','Cibule',null,'pokud nemáš','týden ~9 ks'],
+      ['mraz','fazolky','Zelené fazolky mražené',600,'g','Po 90 g, St 100 g, Pá 400 g'],
+      ['spiz','tahini','Tahini pasta',180,'g','chléb 150 g + Út kuře 30 g'],
+      ['spiz','kmin','Římský kmín',null,'1 balení','chléb + fazolová polévka'],
+      ['spiz','hrubasul','Hrubá nebo vločková sůl',null,'1 balení','posyp chleba'],
+      ['spiz','prasek','Kypřící prášek bez fosfátů',1,'ks','pokud nezbyl'],
+      ['spiz','basmati','Rýže basmati',70,'g',''],
+      ['spiz','vyvar','Vývar zeleninový (kostky)',580,'ml','Po 180 ml + čočka 400 ml']
+    ]},
+  { id:'ut', short:'Út', name:'Úterý',
+    meals:[['Snídaně',[[5,'Nízkosacharidový chléb + 2 lžíce cottage light + 2–3 vařená vejce + 2 lžíce kimči']]],
+           ['Oběd',[[65,'Tahini kuře s quinoou a brokolicí']]],
+           ['Večeře',[[52,'Tuňáková pizza z pánve'],[13,'Salát z červeného zelí']]]],
+    prep:['Ráno uvař 2–3 vejce natvrdo.'],
+    have:'Už máš: chléb, vejce, tahini, citron, mrkev, petržel.',
+    items:[
+      ['maso','kure','Kuřecí prsa',180,'g',''],
+      ['chlaz','cottagelight','Cottage light',1,'malé balení','2 lžíce'],
+      ['chlaz','kimci','Kimči',1,'sklenice','Út, Čt, So, Ne – 8 lžic; pokud nezbylo z 1. týdne'],
+      ['chlaz','mozzarella','Strouhaná mozzarella',75,'g','Út 40 g + Pá 35 g'],
+      ['zel','cerzeli','Červené zelí',300,'g','Út + So salát (půlka hlávky)'],
+      ['mraz','brokolice','Brokolice mražená',120,'g',''],
+      ['spiz','quinoa','Quinoa',70,'g',''],
+      ['spiz','tunak','Tuňák ve vlastní šťávě',3,'konzervy','Út pizza, Čt placky, So kroketky'],
+      ['spiz','rajcata','Sekaná rajčata v konzervě',2,'× 400 g','Út pizza, St polévka, Ne ragú'],
+      ['spiz','oregano','Sušené oregano',null,'1 balení','']
+    ]},
+  { id:'st', short:'St', name:'Středa',
+    meals:[['Snídaně',[[14,'Rychlá omeleta s pečenou zeleninou a cottagem']]],
+           ['Oběd',[[69,'Pečené brambory s hovězím a sýrem']]],
+           ['Večeře',[[2,'Vydatná fazolová polévka s uzeným tempehem']]]],
+    prep:['Fazolovou polévku uvař rovnou na 2 porce, druhá je na čtvrteční večeři.','Večer uvař 100 g neloupané rýže k čočce (Čt + Pá), ideálně den předem.'],
+    have:'Už máš: vejce, červenou cibuli, fazolky, sekaná rajčata, kmín.',
+    items:[
+      ['maso','hovmlete','Hovězí mleté',180,'g',''],
+      ['chlaz','cottage','Sýr cottage',150,'g','omeleta'],
+      ['chlaz','cedar','Strouhaný čedar',120,'g','St 40 g + So 80 g'],
+      ['chlaz','tempeh','Uzený tempeh',200,'g','2 porce polévky'],
+      ['zel','repa','Červená řepa',70,'g','1 menší'],
+      ['zel','hokkaido','Dýně Hokkaido',100,'g','kousek'],
+      ['zel','brambory','Brambory',300,'g','St 150 g + So 150 g'],
+      ['zel','celer','Řapíkatý celer',140,'g','2 porce polévky'],
+      ['spiz','fazole','Červené fazole v konzervě',1,'ks','220 g na 2 porce polévky'],
+      ['spiz','ryze','Neloupaná rýže',100,'g','k čočce, pokud nezbyla'],
+      ['spiz','chiliomacka','Kvalitní chilli omáčka',null,'pokud nemáš','']
+    ]},
+  { id:'ct', short:'Čt', name:'Čtvrtek',
+    meals:[['Snídaně',[[16,'Tuňákové placky se sázeným vejcem a pestem + 2 lžíce kimči']]],
+           ['Oběd',[[26,'Červená čočka na paprice + 200 g květáku na páře']]],
+           ['Večeře',[[2,'Vydatná fazolová polévka (2. porce ze středy)']]]],
+    prep:['Čočku uvař rovnou na 2 porce, druhá je na páteční oběd.'],
+    have:'Už máš: tuňák, vejce, pesto, kimči, květák, uvařenou rýži, polévku, vývar.',
+    items:[
+      ['chlaz','parmazan','Parmazán',null,'kousek ~50 g','Čt 20 g, Ne 25 g'],
+      ['spiz','cocka','Červená čočka',120,'g','2 porce'],
+      ['spiz','paprikamleta','Mletá červená paprika',null,'1 balení',''],
+      ['spiz','kokos','Kokosové mléko',1,'plechovka 400 ml','2 porce čočky']
+    ]},
+  { id:'pa', short:'Pá', name:'Pátek',
+    meals:[['Snídaně',[[27,'Jednoduchý brokolicový nákyp']]],
+           ['Oběd',[[26,'Červená čočka (2. porce ze čtvrtka) + 200 g květáku na páře']]],
+           ['Večeře',[[40,'Krůtí roláda s fazolkami']]]],
+    prep:['Roládu udělej rovnou na 2 porce, druhá je na sobotní oběd.'],
+    have:'Už máš: vejce, mozzarellu, čočku, květák, fazolky, pesto.',
+    items:[
+      ['maso','krutiprsa','Krůtí prsa',340,'g','2 porce rolády (Pá + So)'],
+      ['chlaz','zerve','Žervé',70,'g','2 porce rolády'],
+      ['zel','brokolice2','Brokolice čerstvá',250,'g','nákyp'],
+      ['spiz','susrajcata','Sušená rajčata',40,'g','2 porce rolády']
+    ]},
+  { id:'so', short:'So', name:'Sobota',
+    meals:[['Snídaně',[[24,'Plněné cottage palačinky s hráškem (místo salátu 2 lžíce kimči)']]],
+           ['Oběd',[[40,'Krůtí roláda (2. porce z pátku) + vařené brambory 150 g']]],
+           ['Večeře',[[51,'Tuňákové kroketky s čedarem'],[13,'Salát z červeného zelí']]]],
+    prep:['Štrúdl na nedělní snídani můžeš upéct už večer.'],
+    have:'Už máš: vejce, kimči, roládu, brambory, tuňák, čedar, červené zelí, mrkev, petržel.',
+    items:[
+      ['maso','hovmlete','Hovězí mleté',160,'g','na nedělní ragú'],
+      ['chlaz','cottage','Sýr cottage',500,'g','So palačinka 200 g + Ne štrúdl 300 g'],
+      ['chlaz','jogurt','Bílý jogurt',70,'g','dip ke kroketám'],
+      ['chlaz','majoneza','Majonéza',20,'g','nejmenší balení'],
+      ['mraz','hrasek','Hrášek mražený',100,'g',''],
+      ['spiz','pohanka','Pohanková mouka',20,'g',''],
+      ['spiz','strouhanka','Kukuřičná strouhanka',20,'g','pokud nezbyla']
+    ]},
+  { id:'ne', short:'Ne', name:'Neděle',
+    meals:[['Snídaně',[[73,'Štrúdl z cottage těsta, 3 porce (z 10)']]],
+           ['Oběd',[[53,'Batátové gnocchi s hovězím ragú + 2 lžíce kimči']]],
+           ['Večeře',[[11,'Přílohový kapustičkový salát + 2–3 míchaná vejce']]]],
+    prep:['Zbytek štrúdlu nakrájej na porce a zamraz.'],
+    have:'Už máš: cottage, vejce, hovězí, sekaná rajčata, parmazán, kimči, citron.',
+    items:[
+      ['zel','banan','Banán zralý',120,'g','1 ks'],
+      ['zel','jablka','Jablka',300,'g','2 ks'],
+      ['zel','bataty','Batáty',170,'g','1 menší'],
+      ['zel','kapusta','Růžičková kapusta',300,'g',''],
+      ['spiz','mandlmouka','Mandlová mouka',30,'g',''],
+      ['spiz','mouka','Hladká špaldová mouka',45,'g','pokud nezbyla'],
+      ['spiz','rozinky','Rozinky',10,'g','pokud nezbyly'],
+      ['spiz','mandle','Mandlové plátky',10,'g','pokud nezbyly']
+    ]}
+];
+
+const WEEKS = [
+  { n: 1, days: WEEK1, store: 'restartujem-t1-v1' },
+  { n: 2, days: WEEK2, store: 'restartujem-t2-v1' }
+];
+let wk = WEEKS[0];
+try { const n = +localStorage.getItem('restartujem-nakupy-tyden'); const f = WEEKS.find(w => w.n === n); if (f) wk = f; } catch (e) {}
+let DAYS, STORE, checked, sel;
+function loadWeek() {
+  DAYS = wk.days; STORE = wk.store; checked = {}; sel = new Set(['po']);
+  try { checked = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (e) { checked = {}; }
+  try { const s = JSON.parse(localStorage.getItem(STORE + '-sel') || 'null'); if (Array.isArray(s) && s.length) sel = new Set(s); } catch (e) {}
+}
+loadWeek();
 function save() {
-  try { localStorage.setItem(STORE, JSON.stringify(checked)); localStorage.setItem(STORE + '-sel', JSON.stringify([...sel])); } catch (e) {}
+  try { localStorage.setItem(STORE, JSON.stringify(checked)); localStorage.setItem(STORE + '-sel', JSON.stringify([...sel])); localStorage.setItem('restartujem-nakupy-tyden', String(wk.n)); } catch (e) {}
 }
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt = n => String(Math.round(n * 10) / 10).replace('.', ',');
 
 function renderChips() {
+  document.getElementById('nweek').innerHTML = '<span class="lbl">Týden:</span>' +
+    [1,2,3,4,5].map(n => WEEKS.some(w => w.n === n)
+      ? `<button class="chip" type="button" data-w="${n}" aria-pressed="${n === wk.n}">${n}.</button>`
+      : `<button class="chip" type="button" disabled title="Zatím nepřidáno" style="opacity:.35">${n}.</button>`).join('');
   const el = document.getElementById('chips');
   el.innerHTML = DAYS.map(d =>
     `<button class="chip" type="button" data-id="${d.id}" aria-pressed="${sel.has(d.id)}" title="${d.name}">${d.short}</button>`
@@ -477,6 +615,11 @@ function renderList() {
 
 function render() { renderChips(); renderDays(); renderList(); }
 
+document.getElementById('nweek').addEventListener('click', e => {
+  const b = e.target.closest('[data-w]'); if (!b) return;
+  const f = WEEKS.find(w => w.n === +b.dataset.w); if (!f || f === wk) return;
+  wk = f; loadWeek(); save(); render();
+});
 document.getElementById('chips').addEventListener('click', e => {
   const b = e.target.closest('.chip'); if (!b) return;
   const id = b.dataset.id;
