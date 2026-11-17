@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Restartujem</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2f6b4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Restartujem">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: sticky day picker on top, then the chosen day's meals and one merged checklist grouped by shop section. */
+:root {
+  --bg: #f5f7f4;
+  --surface: #ffffff;
+  --fg: #1d2420;
+  --muted: #5e6b63;
+  --line: #dfe5df;
+  --accent: #2f6b4f;
+  --accent-soft: #e2efe7;
+  --peach: #f6dccb;
+  --peach-fg: #7a3f1d;
+  --done: #9aa59e;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121714; --surface: #1a211d; --fg: #e6ece8; --muted: #9aa9a0; --line: #2b3530;
+    --accent: #7fc4a0; --accent-soft: #1f3329; --peach: #3d2a1f; --peach-fg: #f0c3a5; --done: #5f6b64;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121714; --surface: #1a211d; --fg: #e6ece8; --muted: #9aa9a0; --line: #2b3530;
+  --accent: #7fc4a0; --accent-soft: #1f3329; --peach: #3d2a1f; --peach-fg: #f0c3a5; --done: #5f6b64;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.5;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--bg);
+}
+.wrap {
+  max-width: 640px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+h1 {
+  font-family: var(--font-display); font-weight: 700; font-size: 1.75rem;
+  line-height: 1.15; margin: 0; text-wrap: balance;
+}
+.lead { color: var(--muted); margin: 6px 0 0; font-size: 0.95rem; }
+.picker {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); padding-block: 12px 10px; margin-top: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  font: 600 0.95rem/1 var(--font-body); color: var(--fg);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+  padding: 10px 14px; cursor: pointer; min-width: 46px;
+}
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.chip.spiz { margin-left: auto; }
+.chip.spiz[aria-pressed="true"] { background: var(--peach-fg); border-color: var(--peach-fg); }
+.chip:focus-visible, button:focus-visible, label:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { font-size: 0.8rem; color: var(--muted); margin: 8px 0 0; }
+.progress { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { flex: 1; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+@media (prefers-reduced-motion: reduce) { .bar > i { transition: none; } }
+
+.day { margin-top: 22px; }
+.day h2 {
+  font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; margin: 0 0 8px;
+}
+.meals { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.meals li { display: grid; grid-template-columns: 74px 1fr; gap: 8px; font-size: 0.93rem; }
+.meals .when { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: .06em; padding-top: 3px; }
+.num {
+  display: inline-block; min-width: 1.9em; text-align: center; font-size: 0.75rem; font-weight: 600;
+  background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 1px 4px; margin-right: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.note-box {
+  margin-top: 10px; padding: 10px 12px; border-radius: 8px; font-size: 0.88rem;
+  background: var(--peach); color: var(--peach-fg);
+}
+.note-box p { margin: 0; }
+.note-box p + p { margin-top: 4px; }
+.have { margin-top: 8px; font-size: 0.85rem; color: var(--muted); }
+
+.list-title {
+  font-family: var(--font-display); font-weight: 700; font-size: 1.3rem;
+  margin: 30px 0 4px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.reset {
+  font: 500 0.8rem var(--font-body); color: var(--muted); background: none;
+  border: 0; text-decoration: underline; cursor: pointer; padding: 4px;
+}
+.cat {
+  font-size: 0.75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+  margin: 18px 0 4px; font-weight: 600;
+}
+.items { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.items li + li { border-top: 1px solid var(--line); }
+.item { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: start; padding: 11px 12px; cursor: pointer; }
+.item input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); cursor: pointer; }
+.item .name { font-weight: 500; min-width: 0; }
+.item .sub { display: block; font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+.item .amt { font-variant-numeric: tabular-nums; font-size: 0.9rem; white-space: nowrap; text-align: right; }
+.item .tags { display: block; font-size: 0.72rem; color: var(--accent); margin-top: 2px; text-align: right; }
+.item.checked .name, .item.checked .amt { color: var(--done); text-decoration: line-through; }
+.item.checked .sub { color: var(--done); }
+.empty { color: var(--muted); font-size: 0.9rem; padding: 12px 0; }
+footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0}</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Nákupy na 1. týden</h1>
+  <p class="lead">Hubnu 5× rychleji · varianta podzim/zima. Seznam dne obsahuje, co na ten den potřebuješ. Nakupuj ho den předem.</p>
+
+  <div class="picker">
+    <div class="chips" id="chips" role="group" aria-label="Vyber dny"></div>
+    <p class="hint">Ťukni na víc dní najednou a seznamy se sečtou do jednoho nákupu.</p>
+    <div class="progress"><div class="bar"><i id="bar"></i></div><span id="count">0 / 0</span></div>
+  </div>
+
+  <div id="days"></div>
+  <div id="list"></div>
+
+  <footer>Odškrtnuté položky si telefon pamatuje. Množství jsou spočítaná podle receptů z knihy.</footer>
+</div>
+
+<script>
+const CATS = {
+  maso: 'Maso a ryby',
+  chlaz: 'Chlazené a vejce',
+  zel: 'Zelenina a ovoce',
+  mraz: 'Mražené',
+  spiz: 'Spíž – trvanlivé'
+};
+// [cat, key, name, qty|null, unit, note]
+const DAYS = [
+  { id:'po', short:'Po', name:'Pondělí',
+    meals:[['Snídaně',[[14,'Rychlá omeleta s pečenou zeleninou a cottagem']]],
+           ['Oběd',[[36,'Kuřecí kari na cibulové pastě + 70 g rýže'],[13,'Salát z červeného zelí']]],
+           ['Večeře',[[1,'Pikantní mrkvový krém']]]],
+    prep:['Kari uvař rovnou na 2 porce, druhá je na úterní večeři.'],
+    have:'',
+    items:[
+      ['maso','kure','Kuřecí prsa',360,'g','2 porce kari (Po oběd + Út večeře)'],
+      ['chlaz','vejce','Vejce',20,'ks','na celý týden (2 × 10)'],
+      ['chlaz','cottage','Sýr cottage',2,'× 150 g','druhé balení na středu'],
+      ['zel','repa','Červená řepa',70,'g','1 menší bulva'],
+      ['zel','hokkaido','Dýně Hokkaido',100,'g','stačí kousek nebo nejmenší dýně'],
+      ['zel','cerzeli','Červené zelí',150,'g','čtvrtka menší hlávky'],
+      ['zel','mrkev','Mrkev',1,'kg','na celý týden (spotřebuješ asi 565 g)'],
+      ['zel','petrzel','Petržel čerstvá',1,'svazek','Po salát, Čt rýže'],
+      ['zel','citron','Citron (bio)',1,'ks','Po salát, Út kapustičky – i kůra'],
+      ['zel','zazvor','Zázvor',null,'kousek ~40 g','Po krém, St marináda na vejce'],
+      ['zel','chilli','Chilli paprička',1,'ks',''],
+      ['zel','cibule','Cibule',1,'kg','na celý týden, asi 10 ks'],
+      ['zel','cercib','Červená cibule',2,'ks','Po, Pá, So'],
+      ['zel','koriandr','Koriandr čerstvý',1,'svazek','do kari, nepovinné'],
+      ['spiz','ghi','Ghí (přepuštěné máslo)',null,'1 sklenice','celý týden'],
+      ['spiz','olej','Extra panenský olivový olej',null,'1 láhev','na saláty a pečení'],
+      ['spiz','soja','Přírodní sójová omáčka',null,'1 láhev',''],
+      ['spiz','kari','Kari koření',null,'1 balení',''],
+      ['spiz','protlak','Rajčatový protlak',null,'1 malý','~40 g + 2 lžičky'],
+      ['spiz','kokos','Kokosové mléko',2,'plechovky','celý týden ~675 ml'],
+      ['spiz','ryze','Neloupaná rýže',120,'g','Po 70 g + So 50 g'],
+      ['spiz','cocka','Hnědá čočka v konzervě',1,'ks','Po 100 g + So 80 g, zbytek zamraz'],
+      ['spiz','sul','Sůl a pepř',null,'pokud nemáš','']
+    ]},
+  { id:'ut', short:'Út', name:'Úterý',
+    meals:[['Snídaně',[[18,'Bylinková frittata s brokolicí (1. porce)']]],
+           ['Oběd',[[21,'Krémové těstoviny s ricottou a dýní + 3 lžíce kimči']]],
+           ['Večeře',[[36,'Kuřecí kari (druhá porce z pondělí)'],[11,'Přílohový kapustičkový salát']]]],
+    prep:['Frittata je na 2 porce, druhou sníš ve středu.','Večer upeč hovězí rovnou na 2 porce (středa + čtvrtek oběd).'],
+    have:'Už máš: kari z pondělí, vejce, mrkev, cibuli, citron.',
+    items:[
+      ['maso','hovezi','Hovězí na pomalé pečení',360,'g','plec, kýta, lopatka nebo pupek – 2 porce'],
+      ['chlaz','mleko','Mléko',100,'ml','nejmenší balení'],
+      ['chlaz','cedar','Strouhaný čedar (nebo eidam)',80,'g','frittata'],
+      ['chlaz','ricotta','Ricotta',1,'balení','Út 65 g, zbytek 70 g na neděli'],
+      ['chlaz','parmazan','Parmazán',null,'kousek ~50 g','na celý týden'],
+      ['chlaz','kimci','Kimči',1,'sklenice ~250 g','Út, Čt, Pá'],
+      ['zel','maslova','Máslová dýně',1,'menší','potřebuješ 200 g očištěné'],
+      ['zel','kapusta','Růžičková kapusta',300,'g',''],
+      ['zel','brambory','Brambory menší',300,'g','k hovězímu'],
+      ['mraz','brokolice','Brokolice mražená',600,'g','Út 200 g, So 250 g, Ne 150 g'],
+      ['spiz','testoviny','Luštěninové těstoviny',70,'g',''],
+      ['spiz','tymian','Sušený tymián',null,'1 balení',''],
+      ['spiz','rozinky','Rozinky',10,'g',''],
+      ['spiz','mandle','Mandlové plátky',10,'g',''],
+      ['spiz','balzamiko','Balzamikový ocet',null,'1 láhev','2 lžíce do hovězího']
+    ]},
+  { id:'st', short:'St', name:'Středa',
+    meals:[['Snídaně',[[18,'Bylinková frittata (2. porce)']]],
+           ['Oběd',[[58,'Hovězí na zelenině z jednoho hrnce']]],
+           ['Večeře',[[30,'Zelné nudle se sýrovou omáčkou a křupavým tempehem']]]],
+    prep:['Večer připrav čtvrteční snídani: uvař 4 vejce a nech je přes noc v marinádě (asijská vejce, recept 20).','Upeč tvarohové houstičky (4 ks): 1 na čtvrtek, 1 na pátek, 2 zamraz na další týden.'],
+    have:'Už máš: frittatu, hovězí, cottage, parmazán, vejce, zázvor, kimči.',
+    items:[
+      ['zel','zeli','Bílé zelí',350,'g','malá hlávka'],
+      ['chlaz','tempeh','Uzený tempeh',180,'g','St 80 g + Čt 100 g'],
+      ['chlaz','tvaroh','Tvaroh jemný (trojúhelník)',250,'g','na houstičky'],
+      ['spiz','cesnek','Sušený česnek',null,'1 balení',''],
+      ['spiz','rocet','Rýžový ocet',20,'ml','marináda na vejce'],
+      ['spiz','sirup','Čekankový sirup',null,'1 láhev','St 20 g + So 20 g'],
+      ['spiz','mouka','Hladká špaldová mouka',240,'g','houstičky'],
+      ['spiz','prasek','Kypřící prášek bez fosfátů',1,'ks','']
+    ]},
+  { id:'ct', short:'Čt', name:'Čtvrtek',
+    meals:[['Snídaně',[[20,'Asijská vejce s kimči'],[6,'Rychlá tvarohová houstička, 1 ks']]],
+           ['Oběd',[[58,'Hovězí na zelenině (2. porce z úterka)']]],
+           ['Večeře',[[25,'Smažená zeleninová rýže s vejcem a tempehem']]]],
+    prep:[],
+    have:'Už máš: asijská vejce, houstičku, hovězí, tempeh, vejce, petržel.',
+    items:[
+      ['mraz','brokryze','Brokolicová nebo květáková rýže',240,'g',''],
+      ['spiz','sezam','Sezamová semínka',null,'1 balení','na ozdobu, nepovinné']
+    ]},
+  { id:'pa', short:'Pá', name:'Pátek',
+    meals:[['Snídaně',[[6,'Houstička namazaná žervé + 2–3 vařená vejce + 2 lžíce kimči']]],
+           ['Oběd',[[45,'Čerstvé rybí prsty z lososa + hrášek']]],
+           ['Večeře',[[41,'Pečené krůtí kuličky s květákovým pyré']]]],
+    prep:['Ráno uvař 2–3 vejce natvrdo.','Večer uvař 50 g rýže na sobotní krůtí misku (ideálně den předem).'],
+    have:'Už máš: houstičku, kimči, parmazán, vejce, červenou cibuli.',
+    items:[
+      ['maso','losos','Losos filet',180,'g',''],
+      ['maso','kruti','Krůtí mleté maso',330,'g','Pá 180 g + So 150 g, spotřebuj do soboty'],
+      ['chlaz','zerve','Žervé',40,'g','nejmenší balení'],
+      ['chlaz','jogurt','Bílý jogurt',1,'kelímek ~300 g','Pá 90 g + Ne 200 g'],
+      ['zel','kvetak','Květák',1,'velký ~700 g','Pá 370 g + Ne 300 g'],
+      ['zel','petrzel','Petržel čerstvá',1,'svazek','Pá kuličky, Ne polévka – jen pokud pondělní zvadla'],
+      ['mraz','hrasek','Hrášek mražený',140,'g',''],
+      ['spiz','strouhanka','Kukuřičná strouhanka',75,'g','rybí prsty + kuličky'],
+      ['spiz','umeocet','Umeocet',null,'malá láhev','nepovinné, jde nahradit citronem']
+    ]},
+  { id:'so', short:'So', name:'Sobota',
+    meals:[['Snídaně',[[27,'Jednoduchý brokolicový nákyp']]],
+           ['Oběd',[[44,'Krůtí miska s rýží a pikantním dresinkem']]],
+           ['Večeře',[[28,'Pečená mrkev s čočkou a tahini dresinkem']]]],
+    prep:['Večer připrav rýžové nudle podle návodu na obalu (na nedělní oběd).'],
+    have:'Už máš: brokolici, vejce, krůtí maso, uvařenou rýži, čočku, mrkev, čekankový sirup.',
+    items:[
+      ['chlaz','mozzarella','Strouhaná mozzarella',35,'g',''],
+      ['chlaz','recky','Řecký jogurt 0 %',200,'g','oběd 60 g + večeře 140 g'],
+      ['mraz','edamame','Edamame v luscích',180,'g',''],
+      ['zel','karotka','Baby karotka',180,'g','nepovinné, stačí mrkev, kterou máš'],
+      ['spiz','tahini','Tahini pasta',null,'1 sklenice','1 lžička (12 g)'],
+      ['spiz','chiliomacka','Kvalitní chilli omáčka',null,'1 láhev','do dresinku']
+    ]},
+  { id:'ne', short:'Ne', name:'Neděle',
+    meals:[['Snídaně',[[72,'Zapečený jablečný dezert']]],
+           ['Oběd',[[47,'Jednoduché rybí kari s rýžovými nudlemi']]],
+           ['Večeře',[[3,'Sametová květáková polévka s ricottou a fetou']]]],
+    prep:[],
+    have:'Už máš: brokolici, kokosové mléko, květák, bílý jogurt, petržel, ricottu z úterka.',
+    items:[
+      ['maso','treska','Treska filet bez kůže',180,'g','kup v sobotu, nebo mraženou dřív'],
+      ['chlaz','feta','Sýr feta',40,'g',''],
+      ['chlaz','vyvar','Vývar zeleninový nebo kuřecí',180,'ml','nebo kostka'],
+      ['chlaz','ricotta2','Ricotta',70,'g','jen pokud úterní zbytek už není dobrý'],
+      ['zel','jablko','Jablko',150,'g','1 větší'],
+      ['spiz','vlocky','Ovesné vločky',30,'g',''],
+      ['spiz','protein','Protein (libovolná příchuť)',30,'g',''],
+      ['spiz','skorice','Skořice',null,'1 balení',''],
+      ['spiz','karipasta','Červená kari pasta',null,'1 sklenička','1 vrchovatá lžička'],
+      ['spiz','nudle','Rýžové nudle',50,'g','']
+    ]}
+];
+
+const STORE = 'restartujem-t1-v1';
+let checked = {};
+let sel = new Set(['po']);
+try { checked = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (e) { checked = {}; }
+try { const s = JSON.parse(localStorage.getItem(STORE + '-sel') || 'null'); if (Array.isArray(s) && s.length) sel = new Set(s); } catch (e) {}
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify(checked)); localStorage.setItem(STORE + '-sel', JSON.stringify([...sel])); } catch (e) {}
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = n => String(Math.round(n * 10) / 10).replace('.', ',');
+
+function renderChips() {
+  const el = document.getElementById('chips');
+  el.innerHTML = DAYS.map(d =>
+    `<button class="chip" type="button" data-id="${d.id}" aria-pressed="${sel.has(d.id)}" title="${d.name}">${d.short}</button>`
+  ).join('') + `<button class="chip spiz" type="button" data-id="spiz" aria-pressed="${sel.has('spiz')}">Spíž</button>`;
+}
+
+function selectedDays() { return DAYS.filter(d => sel.has(d.id)); }
+
+function renderDays() {
+  const el = document.getElementById('days');
+  if (sel.has('spiz')) {
+    el.innerHTML = `<section class="day"><h2>Spíž na celý týden</h2>
+      <p class="have">Trvanlivé věci můžeš koupit najednou, klidně online. Většina vydrží i na další týdny. U každé položky je den, kdy ji potřebuješ poprvé.</p></section>`;
+    return;
+  }
+  el.innerHTML = selectedDays().map(d => `
+    <section class="day">
+      <h2>${d.name}</h2>
+      <ul class="meals">${d.meals.map(([w, rs]) =>
+        `<li><span class="when">${w}</span><span>${rs.map(([n, t]) => `<span class="num">${n}</span>${esc(t)}`).join('<br>')}</span></li>`).join('')}
+      </ul>
+      ${d.prep.length ? `<div class="note-box">${d.prep.map(p => `<p>${esc(p)}</p>`).join('')}</div>` : ''}
+      ${d.have ? `<p class="have">${esc(d.have)}</p>` : ''}
+    </section>`).join('');
+}
+
+function collect() {
+  const spizMode = sel.has('spiz');
+  const days = spizMode ? DAYS : selectedDays();
+  const map = new Map();
+  for (const d of days) {
+    for (const [cat, key, name, q, u, note] of d.items) {
+      if (spizMode && cat !== 'spiz') continue;
+      const id = key + '@' + d.id;
+      let m = map.get(key);
+      if (!m) { m = { cat, key, name, q, u, notes: [], days: [], ids: [] }; map.set(key, m); }
+      else if (typeof m.q === 'number' && typeof q === 'number' && m.u === u) m.q += q;
+      else if (q !== m.q || u !== m.u) { m.extra = (m.extra || []).concat([(q != null ? fmt(q) + ' ' : '') + u]); }
+      if (note) m.notes.push(note);
+      m.days.push(d.short); m.ids.push(id);
+    }
+  }
+  return [...map.values()];
+}
+
+function renderList() {
+  const items = collect();
+  const el = document.getElementById('list');
+  const multi = sel.has('spiz') || selectedDays().length > 1;
+  const order = Object.keys(CATS);
+  let html = `<h2 class="list-title">${sel.has('spiz') ? 'Seznam do spíže' : 'Co koupit'}<button class="reset" type="button" id="reset">Zrušit odškrtnutí</button></h2>`;
+  if (!items.length) html += `<p class="empty">Vyber nahoře aspoň jeden den.</p>`;
+  for (const c of order) {
+    const group = items.filter(i => i.cat === c);
+    if (!group.length) continue;
+    if (!sel.has('spiz')) html += `<h3 class="cat">${CATS[c]}</h3>`;
+    html += `<ul class="items">` + group.map(i => {
+      const done = i.ids.every(id => checked[id]);
+      const amt = (i.q != null ? fmt(i.q) + ' ' : '') + i.u + (i.extra ? ' + ' + i.extra.join(' + ') : '');
+      const cid = 'c-' + i.key;
+      const note = [...new Set(i.notes)].join(' · ');
+      return `<li><label class="item${done ? ' checked' : ''}" for="${cid}">
+        <input type="checkbox" id="${cid}" data-ids="${i.ids.join(',')}" ${done ? 'checked' : ''}>
+        <span class="name">${esc(i.name)}${note ? `<span class="sub">${esc(note)}</span>` : ''}</span>
+        <span class="amt">${esc(amt)}${multi ? `<span class="tags">${i.days.join(', ')}</span>` : ''}</span>
+      </label></li>`;
+    }).join('') + `</ul>`;
+  }
+  el.innerHTML = html;
+  const total = items.length, got = items.filter(i => i.ids.every(id => checked[id])).length;
+  document.getElementById('count').textContent = `${got} / ${total} v košíku`;
+  document.getElementById('bar').style.width = total ? (got / total * 100) + '%' : '0';
+}
+
+function render() { renderChips(); renderDays(); renderList(); }
+
+document.getElementById('chips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  const id = b.dataset.id;
+  if (id === 'spiz') { sel = sel.has('spiz') ? new Set(['po']) : new Set(['spiz']); }
+  else {
+    sel.delete('spiz');
+    if (sel.has(id)) { if (sel.size > 1) sel.delete(id); } else sel.add(id);
+  }
+  save(); render();
+});
+document.getElementById('list').addEventListener('change', e => {
+  const cb = e.target; if (!cb.matches('input[type=checkbox]')) return;
+  for (const id of cb.dataset.ids.split(',')) { if (cb.checked) checked[id] = 1; else delete checked[id]; }
+  save(); renderList();
+});
+document.getElementById('list').addEventListener('click', e => {
+  if (e.target.id !== 'reset') return;
+  for (const i of collect()) for (const id of i.ids) delete checked[id];
+  save(); renderList();
+});
+render();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+</script>
+</body>
+</html>
