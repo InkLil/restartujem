@@ -1,6 +1,6 @@
 // Offline: aplikace se po prvním otevření servíruje z cache.
 // Na pozadí si stáhne novou verzi, takže změny se projeví při dalším otevření.
-const CACHE = 'restartujem-v3';
+const CACHE = 'restartujem-v4';
 const FILES = ['./', './index.html', './manifest.json', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

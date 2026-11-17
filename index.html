@@ -163,7 +163,9 @@ footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
 #mcopymsg { font-size: 0.85rem; color: var(--muted); }
 
 .wchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
-.wchips .lbl { font-size: 0.85rem; color: var(--muted); margin-right: 4px; }
+.wchips .lbl { font-size: 0.85rem; color: var(--muted); margin-right: 2px; white-space: nowrap; }
+.wchips { flex-wrap: nowrap; }
+.wchips .chip { flex: 1 1 0; min-width: 0; padding: 9px 0; max-width: 56px; }
 .rgrid {
   display: grid; grid-template-columns: 44px repeat(5, minmax(0, 1fr)) 34px; gap: 6px 5px;
   margin-top: 16px; align-items: center;
