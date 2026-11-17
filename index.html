@@ -127,6 +127,20 @@ h1 {
 .item.checked .name, .item.checked .amt { color: var(--done); text-decoration: line-through; }
 .item.checked .sub { color: var(--done); }
 .empty { color: var(--muted); font-size: 0.9rem; padding: 12px 0; }
+.items li.mine { display: flex; align-items: stretch; }
+.items li.mine .item { flex: 1; min-width: 0; grid-template-columns: 26px 1fr auto; }
+.del {
+  flex: none; width: 44px; border: 0; border-left: 1px solid var(--line); background: none;
+  color: var(--muted); font-size: 1.3rem; line-height: 1; cursor: pointer;
+}
+.addmine { margin-top: 22px; }
+.addmine .cat { display: block; }
+.addrow { display: flex; gap: 8px; }
+.addrow input {
+  flex: 1; min-width: 0; font: 400 16px var(--font-body); color: var(--fg); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+}
+.addrow input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
 footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
 
 .tabs { display: flex; gap: 4px; margin-top: 14px; background: var(--line); padding: 4px; border-radius: 12px; }
@@ -211,6 +225,14 @@ footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
   <div id="days"></div>
   <div id="list"></div>
 
+  <form class="addmine" id="addmine" autocomplete="off">
+    <label for="minetext" class="cat" id="minelbl">Přidat vlastní položku</label>
+    <div class="addrow">
+      <input id="minetext" type="text" maxlength="80" placeholder="např. mléko do kávy 1 l" enterkeyhint="done">
+      <button class="btn" type="submit">Přidat</button>
+    </div>
+  </form>
+
   <footer>Odškrtnuté položky si telefon pamatuje. Množství jsou spočítaná podle receptů z knihy.</footer>
   </div>
 
@@ -254,8 +276,15 @@ const CATS = {
   chlaz: 'Chlazené a vejce',
   zel: 'Zelenina a ovoce',
   mraz: 'Mražené',
-  spiz: 'Spíž – trvanlivé'
+  spiz: 'Spíž – trvanlivé',
+  moje: 'Moje položky'
 };
+// vlastní položky: { t1: { po: [{ k, t }], spiz: [...] } }
+const MSTORE_MINE = 'restartujem-vlastni';
+let mine = {};
+try { mine = JSON.parse(localStorage.getItem(MSTORE_MINE) || '{}') || {}; } catch (e) { mine = {}; }
+function mineFor(dayId) { return ((mine['t' + wk.n] || {})[dayId]) || []; }
+function saveMine() { try { localStorage.setItem(MSTORE_MINE, JSON.stringify(mine)); } catch (e) {} }
 // [cat, key, name, qty|null, unit, note]
 const WEEK1 = [
   { id:'po', short:'Po', name:'Pondělí',
@@ -581,6 +610,11 @@ function collect() {
       m.days.push(d.short); m.ids.push(id);
     }
   }
+  const mineDays = spizMode ? [{ id: 'spiz', short: 'Spíž' }] : days;
+  for (const d of mineDays) for (const x of mineFor(d.id)) {
+    const key = 'm-' + x.k;
+    map.set(key, { cat: 'moje', key, name: x.t, q: null, u: '', notes: [], days: [d.short], ids: [key + '@' + d.id], mine: { day: d.id, k: x.k } });
+  }
   return [...map.values()];
 }
 
@@ -594,23 +628,32 @@ function renderList() {
   for (const c of order) {
     const group = items.filter(i => i.cat === c);
     if (!group.length) continue;
-    if (!sel.has('spiz')) html += `<h3 class="cat">${CATS[c]}</h3>`;
+    if (!sel.has('spiz') || c === 'moje') html += `<h3 class="cat">${CATS[c]}</h3>`;
     html += `<ul class="items">` + group.map(i => {
       const done = i.ids.every(id => checked[id]);
       const amt = (i.q != null ? fmt(i.q) + ' ' : '') + i.u + (i.extra ? ' + ' + i.extra.join(' + ') : '');
       const cid = 'c-' + i.key;
       const note = [...new Set(i.notes)].join(' · ');
-      return `<li><label class="item${done ? ' checked' : ''}" for="${cid}">
+      return `<li${i.mine ? ' class="mine"' : ''}><label class="item${done ? ' checked' : ''}" for="${cid}">
         <input type="checkbox" id="${cid}" data-ids="${i.ids.join(',')}" ${done ? 'checked' : ''}>
         <span class="name">${esc(i.name)}${note ? `<span class="sub">${esc(note)}</span>` : ''}</span>
         <span class="amt">${esc(amt)}${multi ? `<span class="tags">${i.days.join(', ')}</span>` : ''}</span>
-      </label></li>`;
+      </label>${i.mine ? `<button class="del" type="button" data-day="${i.mine.day}" data-k="${i.mine.k}" aria-label="Smazat ${esc(i.name)}">×</button>` : ''}</li>`;
     }).join('') + `</ul>`;
   }
   el.innerHTML = html;
   const total = items.length, got = items.filter(i => i.ids.every(id => checked[id])).length;
   document.getElementById('count').textContent = `${got} / ${total} v košíku`;
   document.getElementById('bar').style.width = total ? (got / total * 100) + '%' : '0';
+  const t = mineTarget();
+  document.getElementById('minelbl').textContent = t.id === 'spiz' ? 'Přidat vlastní položku do spíže' : `Přidat vlastní položku (${t.name})`;
+}
+
+// kam se přidá vlastní položka: Spíž, nebo první vybraný den
+function mineTarget() {
+  if (sel.has('spiz')) return { id: 'spiz', name: 'Spíž' };
+  const d = selectedDays()[0] || DAYS[0];
+  return { id: d.id, name: d.name };
 }
 
 function render() { renderChips(); renderDays(); renderList(); }
@@ -635,7 +678,25 @@ document.getElementById('list').addEventListener('change', e => {
   for (const id of cb.dataset.ids.split(',')) { if (cb.checked) checked[id] = 1; else delete checked[id]; }
   save(); renderList();
 });
+document.getElementById('addmine').addEventListener('submit', e => {
+  e.preventDefault();
+  const inp = document.getElementById('minetext');
+  const t = inp.value.trim(); if (!t) return;
+  const day = mineTarget().id, w = 't' + wk.n;
+  mine[w] = mine[w] || {}; mine[w][day] = mine[w][day] || [];
+  mine[w][day].push({ k: Date.now().toString(36), t });
+  saveMine(); inp.value = ''; renderList();
+});
 document.getElementById('list').addEventListener('click', e => {
+  const del = e.target.closest('.del');
+  if (del) {
+    const w = 't' + wk.n, day = del.dataset.day, k = del.dataset.k;
+    const arr = (mine[w] || {})[day] || [];
+    mine[w][day] = arr.filter(x => x.k !== k);
+    delete checked['m-' + k + '@' + day];
+    saveMine(); save(); renderList();
+    return;
+  }
   if (e.target.id !== 'reset') return;
   for (const i of collect()) for (const id of i.ids) delete checked[id];
   save(); renderList();
