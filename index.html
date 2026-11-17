@@ -128,6 +128,40 @@ h1 {
 .item.checked .sub { color: var(--done); }
 .empty { color: var(--muted); font-size: 0.9rem; padding: 12px 0; }
 footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
+
+.tabs { display: flex; gap: 4px; margin-top: 14px; background: var(--line); padding: 4px; border-radius: 12px; }
+.tab {
+  flex: 1; font: 600 0.95rem/1 var(--font-body); color: var(--muted); background: none;
+  border: 0; border-radius: 9px; padding: 11px 8px; cursor: pointer;
+}
+.tab[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.sec { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; margin: 22px 0 4px; }
+.mgrid {
+  display: grid; grid-template-columns: 62px repeat(5, minmax(0, 1fr)); gap: 6px 5px;
+  margin-top: 14px; align-items: start;
+}
+.mh { font-size: 0.72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; text-align: center; }
+.mh small { display: block; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.mrow { font-weight: 600; font-size: 0.85rem; padding-top: 10px; }
+.mrow small { display: block; font-weight: 400; font-size: 0.7rem; color: var(--muted); }
+.mcell input {
+  width: 100%; font: 500 16px var(--font-body); font-variant-numeric: tabular-nums; text-align: center;
+  color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 9px 2px;
+}
+.mcell input:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+.mcell.start input { background: var(--accent-soft); border-color: var(--accent-soft); }
+.diff { display: block; text-align: center; font-size: 0.72rem; min-height: 1.1em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.diff.down { color: var(--accent); font-weight: 600; }
+.howto { margin: 18px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 0.88rem; }
+.howto b { font-weight: 600; }
+.mactions { margin-top: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.btn {
+  font: 600 0.9rem var(--font-body); color: var(--accent); background: var(--surface);
+  border: 1px solid var(--accent); border-radius: 8px; padding: 10px 14px; cursor: pointer;
+}
+#mcopymsg { font-size: 0.85rem; color: var(--muted); }
+#mcopytext { width: 100%; min-height: 9em; margin-top: 10px; font: 0.85rem/1.4 var(--font-body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
 </style>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0}</style>
 </head>
@@ -136,6 +170,12 @@ footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
   <h1>Nákupy na 1. týden</h1>
   <p class="lead">Hubnu 5× rychleji · varianta podzim/zima. Seznam dne obsahuje, co na ten den potřebuješ. Nakupuj ho den předem.</p>
 
+  <nav class="tabs" role="tablist" aria-label="Části aplikace">
+    <button class="tab" type="button" role="tab" data-view="nakupy" aria-selected="true">Nákupy</button>
+    <button class="tab" type="button" role="tab" data-view="mereni" aria-selected="false">Měření</button>
+  </nav>
+
+  <div id="view-nakupy">
   <div class="picker">
     <div class="chips" id="chips" role="group" aria-label="Vyber dny"></div>
     <p class="hint">Ťukni na víc dní najednou a seznamy se sečtou do jednoho nákupu.</p>
@@ -146,6 +186,25 @@ footer { margin-top: 36px; font-size: 0.8rem; color: var(--muted); }
   <div id="list"></div>
 
   <footer>Odškrtnuté položky si telefon pamatuje. Množství jsou spočítaná podle receptů z knihy.</footer>
+  </div>
+
+  <div id="view-mereni" hidden>
+    <h2 class="sec">Měření</h2>
+    <p class="lead">Měř se jednou týdně, vždy ve stejný den, ráno nalačno a stejným metrem. Obvody zapisuj v centimetrech. Váhu můžeš nechat prázdnou.</p>
+    <div class="mgrid" id="mgrid"></div>
+    <ul class="howto">
+      <li><b>Paže:</b> nejširší místo nadloktí, volně spuštěná ruka, vždy stejná ruka.</li>
+      <li><b>Pas:</b> nejužší místo trupu, po výdechu, nevtahovat břicho.</li>
+      <li><b>Boky:</b> nejširší místo přes hýždě, chodidla u sebe.</li>
+      <li><b>Stehna:</b> nejširší místo stehna, vždy stejná noha.</li>
+    </ul>
+    <div class="mactions">
+      <button class="btn" type="button" id="mcopy">Zkopírovat měření</button>
+      <span id="mcopymsg" role="status"></span>
+    </div>
+    <textarea id="mcopytext" readonly hidden></textarea>
+    <footer>Čísla zůstávají jen v tomhle telefonu. Občas si je zkopíruj a pošli si je, ať o ně nepřijdeš. Rozdíl pod políčkem ukazuje změnu oproti startu.</footer>
+  </div>
 </div>
 
 <script>
@@ -399,6 +458,86 @@ document.getElementById('list').addEventListener('click', e => {
   save(); renderList();
 });
 render();
+
+// ── Měření ─────────────────────────────────────────────
+const MROWS = [['start','Start'],['t1','1. týden'],['t2','2. týden'],['t3','3. týden'],['t4','4. týden'],['t5','5. týden']];
+const MCOLS = [['vaha','Váha','kg'],['paze','Paže','cm'],['pas','Pas','cm'],['boky','Boky','cm'],['stehna','Stehna','cm']];
+const MSTORE = 'restartujem-mereni';
+let mdata = {};
+try { mdata = JSON.parse(localStorage.getItem(MSTORE) || '{}') || {}; } catch (e) { mdata = {}; }
+function msave() { try { localStorage.setItem(MSTORE, JSON.stringify(mdata)); } catch (e) {} }
+const num = v => { const n = parseFloat(String(v || '').replace(',', '.')); return isFinite(n) ? n : null; };
+const fmtDate = iso => { const [y, m, d] = iso.split('-'); return `${+d}. ${+m}.`; };
+
+function renderM() {
+  let h = '<span></span>' + MCOLS.map(([, n, u]) => `<span class="mh">${n}<small>${u}</small></span>`).join('');
+  for (const [r, label] of MROWS) {
+    const row = mdata[r] || {};
+    h += `<span class="mrow">${label}<small id="dt-${r}">${row.date ? fmtDate(row.date) : ''}</small></span>`;
+    for (const [c, n] of MCOLS) {
+      h += `<span class="mcell${r === 'start' ? ' start' : ''}"><input id="m-${r}-${c}" data-r="${r}" data-c="${c}" inputmode="decimal" autocomplete="off" aria-label="${label} – ${n}" value="${esc(row[c] || '')}"><span class="diff" id="d-${r}-${c}"></span></span>`;
+    }
+  }
+  document.getElementById('mgrid').innerHTML = h;
+  updateDiffs();
+}
+
+function updateDiffs() {
+  const start = mdata.start || {};
+  for (const [r] of MROWS) {
+    if (r === 'start') continue;
+    for (const [c] of MCOLS) {
+      const el = document.getElementById(`d-${r}-${c}`);
+      const a = num(start[c]), b = num((mdata[r] || {})[c]);
+      if (a == null || b == null) { el.textContent = ''; el.className = 'diff'; continue; }
+      const d = Math.round((b - a) * 10) / 10;
+      el.textContent = d === 0 ? '0' : (d < 0 ? '−' : '+') + fmt(Math.abs(d));
+      el.className = 'diff' + (d < 0 ? ' down' : '');
+    }
+  }
+}
+
+document.getElementById('mgrid').addEventListener('input', e => {
+  const t = e.target; if (!t.dataset.r) return;
+  const row = mdata[t.dataset.r] = mdata[t.dataset.r] || {};
+  row[t.dataset.c] = t.value.trim();
+  if (!row.date && t.value.trim()) {
+    row.date = new Date().toLocaleDateString('sv-SE');
+    document.getElementById('dt-' + t.dataset.r).textContent = fmtDate(row.date);
+  }
+  msave(); updateDiffs();
+});
+
+document.getElementById('mcopy').addEventListener('click', () => {
+  const lines = ['Restartujem – měření (' + MCOLS.map(([, n, u]) => `${n} ${u}`).join(', ') + ')'];
+  for (const [r, label] of MROWS) {
+    const row = mdata[r]; if (!row) continue;
+    const vals = MCOLS.map(([c]) => row[c] || '–');
+    if (vals.every(v => v === '–')) continue;
+    lines.push(`${label}${row.date ? ' (' + fmtDate(row.date) + ')' : ''}: ${vals.join(' / ')}`);
+  }
+  const text = lines.join('\n');
+  const msg = document.getElementById('mcopymsg'), ta = document.getElementById('mcopytext');
+  const fallback = () => { ta.value = text; ta.hidden = false; ta.focus(); ta.select(); msg.textContent = 'Označ text a zkopíruj ho ručně.'; };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => { msg.textContent = 'Zkopírováno.'; ta.hidden = true; }, fallback);
+  } else fallback();
+});
+
+// ── Přepínání záložek ──────────────────────────────────
+function showView(v) {
+  document.getElementById('view-nakupy').hidden = v !== 'nakupy';
+  document.getElementById('view-mereni').hidden = v !== 'mereni';
+  document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === v)));
+  try { localStorage.setItem('restartujem-view', v); } catch (e) {}
+}
+document.querySelector('.tabs').addEventListener('click', e => {
+  const b = e.target.closest('.tab'); if (b) showView(b.dataset.view);
+});
+renderM();
+let startView = 'nakupy';
+try { startView = localStorage.getItem('restartujem-view') || 'nakupy'; } catch (e) {}
+showView(startView === 'mereni' ? 'mereni' : 'nakupy');
 </script>
 
 <script>
